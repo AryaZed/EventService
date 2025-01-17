@@ -28,7 +28,7 @@ public class UserRepository : IUserRepository
         await _context.Users.Where(u => userIds.Contains(u.Id)).ToListAsync();
 
     public async Task<List<User>> GetUsersByGroupIdsAsync(List<Guid> groupIds) =>
-        await _context.Users.Where(u => u.Groups.Any(g => groupIds.Contains(g.Id))).ToListAsync();
+        await _context.Users.Where(u => u.UserUserGroups.Any(g => groupIds.Contains(g.UserGroupId))).ToListAsync();
 
     public async Task<User?> GetByIdAsync(Guid id) =>
     await _context.Users.FindAsync(id);

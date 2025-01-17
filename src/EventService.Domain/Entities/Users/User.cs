@@ -15,29 +15,30 @@ public class User
     public string PhoneNumber { get; private set; }
     public Guid BusinessId { get; private set; }
     public Business Business { get; private set; }
-    public List<UserGroup> Groups { get; private set; } = new();
+    public List<UserUserGroup> UserUserGroups { get; private set; } = new();
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
 
-    private User(string name, string email, string phoneNumber, Business business, List<UserGroup>? groups = null)
+    private User() { }
+
+    private User(string name, string email, string phoneNumber, Business business)
     {
         Name = name;
         Email = email;
         PhoneNumber = phoneNumber;
         Business = business;
         BusinessId = business.Id;
-        Groups = groups ?? new List<UserGroup>();
     }
 
     // ✅ Factory method for creating a new user
-    public static User Create(string name, string email, string phoneNumber, Business business, List<UserGroup>? groups = null)
+    public static User Create(string name, string email, string phoneNumber, Business business)
     {
-        return new User(name, email, phoneNumber, business, groups);
+        return new User(name, email, phoneNumber, business);
     }
 
     // ✅ Factory method for updating an existing user
-    public User Update(string name, string email, string phoneNumber, List<UserGroup>? groups = null)
+    public User Update(string name, string email, string phoneNumber)
     {
-        return new User(name, email, phoneNumber, Business, groups ?? Groups)
+        return new User(name, email, phoneNumber, Business)
         {
             Id = this.Id,
             CreatedAt = this.CreatedAt // Preserve creation date

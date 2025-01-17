@@ -17,6 +17,8 @@ public class Business
 
     public List<User> Users { get; private set; } = new();
 
+    private Business() { }
+
     private Business(string name, string contactEmail, string phoneNumber)
     {
         Name = name;

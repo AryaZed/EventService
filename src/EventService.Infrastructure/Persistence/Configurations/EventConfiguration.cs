@@ -14,6 +14,7 @@ public class EventConfiguration : IEntityTypeConfiguration<Event>
     public void Configure(EntityTypeBuilder<Event> builder)
     {
         builder.HasKey(e => e.Id);
+
         builder.Property(e => e.Title).IsRequired().HasMaxLength(255);
         builder.Property(e => e.Description).IsRequired();
         builder.Property(e => e.ScheduledAt).IsRequired();
@@ -21,6 +22,7 @@ public class EventConfiguration : IEntityTypeConfiguration<Event>
 
         builder.HasOne(e => e.Business)
             .WithMany()
-            .HasForeignKey(e => e.BusinessId);
+            .HasForeignKey(e => e.BusinessId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

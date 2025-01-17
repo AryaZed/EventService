@@ -46,38 +46,5 @@ public class EventProcessor : IEventProcessor
                 _logger.LogError(ex, "❌ Failed to publish event {EventId}", eventEntity.Id);
             }
         }
-    }
-
-    private async Task<List<User>> GetTargetUsers(Event eventEntity)
-    {
-        var rules = eventEntity.GetTargetRules();
-
-        if (rules.SendToAllUsers)
-        {
-            return await _userRepository.GetAllByBusinessIdAsync(eventEntity.BusinessId);
-        }
-
-        var filteredUsers = new List<User>();
-
-        if (rules.UserJoinedInLastDays.HasValue)
-        {
-            var minDate = DateTime.UtcNow.AddDays(-rules.UserJoinedInLastDays.Value);
-            var newUsers = await _userRepository.GetUsersJoinedAfterAsync(eventEntity.BusinessId, minDate);
-            filteredUsers.AddRange(newUsers);
-        }
-
-        if (rules.SpecificUserIds is not null)
-        {
-            var specificUsers = await _userRepository.GetUsersByIdsAsync(rules.SpecificUserIds);
-            filteredUsers.AddRange(specificUsers);
-        }
-
-        if (rules.TargetUserGroups is not null)
-        {
-            var groupUsers = await _userRepository.GetUsersByGroupIdsAsync(rules.TargetUserGroups);
-            filteredUsers.AddRange(groupUsers);
-        }
-
-        return filteredUsers.Distinct().ToList();
-    }
+    }  
 }

@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 namespace EventService.Domain.Entities.Events;
 
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 public class Event
 {
@@ -20,6 +21,9 @@ public class Event
     public Business Business { get; private set; }
     public string TargetRulesJson { get; private set; } // Stores dynamic conditions as JSON
 
+    private Event() { }
+
+    [JsonConstructor]
     private Event(string title, string description, DateTime scheduledAt, Business business, string targetRulesJson)
     {
         Title = title;

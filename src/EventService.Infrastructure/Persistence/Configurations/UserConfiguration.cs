@@ -1,11 +1,6 @@
 ﻿using EventService.Domain.Entities.Users;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace EventService.Infrastructure.Persistence.Configurations;
 
@@ -16,6 +11,12 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasKey(u => u.Id);
         builder.Property(u => u.Name).IsRequired().HasMaxLength(255);
         builder.Property(u => u.Email).IsRequired().HasMaxLength(255);
-        builder.Property(u => u.PhoneNumber).IsRequired().HasMaxLength(20);
+        builder.Property(u => u.PhoneNumber).IsRequired().HasMaxLength(50);
+        builder.Property(u => u.CreatedAt).IsRequired();
+
+        builder.HasOne(u => u.Business)
+            .WithMany()
+            .HasForeignKey(u => u.BusinessId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

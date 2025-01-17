@@ -13,7 +13,9 @@ public class UserGroup
     public string Name { get; private set; }
     public Guid BusinessId { get; private set; }
     public Business Business { get; private set; }
-    public List<User> Users { get; private set; } = new();
+    public List<UserUserGroup> UserUserGroups { get; private set; } = new();
+
+    private UserGroup() { }
 
     private UserGroup(string name, Business business)
     {
