@@ -48,6 +48,9 @@ public static class InfrastructureModule
                 cfg.ReceiveEndpoint("event-processing-queue", e =>
                 {
                     e.ConfigureConsumer<EventConsumer>(context);
+                    e.PrefetchCount = 100; // ✅ Process 100 messages at a time
+                    e.UseConcurrencyLimit(10); // ✅ Allows up to 10 parallel executions
+                    e.UseMessageRetry(r => r.Incremental(3, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2))); // ✅ Retry failed messages
                 });
             });
         });

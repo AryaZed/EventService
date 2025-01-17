@@ -2,6 +2,7 @@
 using EventService.Application.Interfaces.Services.Notifications;
 using EventService.Domain.Entities.Events;
 using EventService.Domain.Entities.Users;
+using MassTransit;
 using Microsoft.Extensions.Logging;
 
 namespace EventService.Application.Services.Events;
@@ -12,17 +13,20 @@ public class EventProcessor : IEventProcessor
     private readonly IUserRepository _userRepository;
     private readonly INotificationService _notificationService;
     private readonly ILogger<EventProcessor> _logger;
+    private readonly IPublishEndpoint _publishEndpoint;
 
     public EventProcessor(
         IEventRepository eventRepository,
         IUserRepository userRepository,
         INotificationService notificationService,
-        ILogger<EventProcessor> logger)
+        ILogger<EventProcessor> logger,
+        IPublishEndpoint publishEndpoint)
     {
         _eventRepository = eventRepository;
         _userRepository = userRepository;
         _notificationService = notificationService;
         _logger = logger;
+        _publishEndpoint = publishEndpoint;
     }
 
     public async Task ProcessScheduledEventsAsync()
@@ -32,13 +36,14 @@ public class EventProcessor : IEventProcessor
 
         foreach (var eventEntity in eventsToProcess)
         {
-            var users = await GetTargetUsers(eventEntity);
-            _logger.LogInformation("Processing event {EventId} for {UserCount} users", eventEntity.Id, users.Count);
-
-            foreach (var user in users)
+            try
             {
-                string message = $"📢 Event Alert: {eventEntity.Title} - {eventEntity.Description}";
-                await _notificationService.SendSmsAsync(user.PhoneNumber, message);
+                await _publishEndpoint.Publish(eventEntity);
+                _logger.LogInformation("✅ Published event {EventId} to RabbitMQ", eventEntity.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Failed to publish event {EventId}", eventEntity.Id);
             }
         }
     }

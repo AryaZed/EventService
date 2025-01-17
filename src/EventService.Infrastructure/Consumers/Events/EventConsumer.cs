@@ -31,11 +31,8 @@ public class EventConsumer : IConsumer<EventService.Domain.Entities.Events.Event
             return;
         }
 
-        foreach (var user in users)
-        {
-            string message = $"📢 Event Alert: {eventEntity.Title} - {eventEntity.Description}";
-            await _notificationService.SendSmsAsync(user.PhoneNumber, message);
-        }
+        var tasks = users.Select(user => _notificationService.SendSmsAsync(user.PhoneNumber, $"📢 {eventEntity.Title}: {eventEntity.Description}"));
+        await Task.WhenAll(tasks);
 
         _logger.LogInformation("✅ Successfully processed event {EventId} and notified {UserCount} users.", eventEntity.Id, users.Count);
     }
