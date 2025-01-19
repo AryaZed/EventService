@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Carter;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -7,6 +7,10 @@ using StackExchange.Redis;
 using Serilog;
 using Serilog.Sinks.Elasticsearch;
 using EventService.Infrastructure;
+using AspNetCoreRateLimit;
+using EventService.WebApi.Middleware;
+using EventService.Application.Interfaces.Services.Payments;
+using EventService.Application.Services.Payments;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,8 +30,25 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog();
 
+// ✅ Add Middleware Dependencies
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<TenantMiddleware>();
+builder.Services.AddMemoryCache();
+builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
+builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+builder.Services.AddInMemoryRateLimiting();
+
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddCarter();
+
+builder.Services.AddHttpClient<PaymentService>();
+
+builder.Services.AddScoped<IPaymentService>(sp =>
+    new PaymentService(
+        sp.GetRequiredService<HttpClient>(),
+        builder.Configuration["Zarinpal:MerchantId"] ?? throw new InvalidOperationException("Zarinpal Merchant ID is missing!"),
+        sp.GetRequiredService<ILogger<PaymentService>>()
+    ));
 
 // Add JWT Authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -99,6 +120,15 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// ✅ Register Middleware Here
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.UseMiddleware<RequestLoggingMiddleware>();
+app.UseMiddleware<PerformanceMonitoringMiddleware>();
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<TenantMiddleware>();
+
+app.UseIpRateLimiting(); // ✅ Apply Rate Limiting
 
 app.UseAuthentication();
 app.UseAuthorization();

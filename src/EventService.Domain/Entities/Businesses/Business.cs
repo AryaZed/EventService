@@ -1,9 +1,5 @@
-﻿using EventService.Domain.Entities.Users;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using EventService.Domain.Entities.Integrations;
+using EventService.Domain.Entities.Users;
 
 namespace EventService.Domain.Entities.Businesses;
 
@@ -16,29 +12,68 @@ public class Business
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
 
     public List<User> Users { get; private set; } = new();
+    public List<Webhook> Webhooks { get; private set; } = new();
+
+    public Guid SubscriptionPlanId { get; private set; }
+    public SubscriptionPlan SubscriptionPlan { get; private set; }
+
+    public DateTime SubscriptionStartDate { get; private set; }
+    public DateTime SubscriptionEndDate { get; private set; }
 
     private Business() { }
 
-    private Business(string name, string contactEmail, string phoneNumber)
+    public Business(string name, string contactEmail, string phoneNumber, SubscriptionPlan subscriptionPlan)
     {
-        Name = name;
-        ContactEmail = contactEmail;
-        PhoneNumber = phoneNumber;
+        Name = name ?? throw new ArgumentNullException(nameof(name));
+        ContactEmail = contactEmail ?? throw new ArgumentNullException(nameof(contactEmail));
+        PhoneNumber = phoneNumber ?? throw new ArgumentNullException(nameof(phoneNumber));
+
+        SubscriptionPlan = subscriptionPlan ?? throw new ArgumentNullException(nameof(subscriptionPlan));
+        SubscriptionPlanId = subscriptionPlan.Id;
+
+        SubscriptionStartDate = DateTime.UtcNow;
+        SubscriptionEndDate = DateTime.UtcNow.AddMonths(1); // Default to 1 month
     }
 
-    private Business(Guid id)
+    // ✅ Factory method for creating a new business with a subscription
+    public static Business Create(string name, string contactEmail, string phoneNumber, SubscriptionPlan subscriptionPlan)
     {
-        Id = id;
+        return new Business(name, contactEmail, phoneNumber, subscriptionPlan);
     }
 
-    public static Business Create(string name, string contactEmail, string phoneNumber)
-    {
-        return new Business(name, contactEmail, phoneNumber);
-    }
-
+    // ✅ Factory method for retrieving an existing business
     public static Business CreateExisting(Guid id)
     {
-        return new Business(id);
+        return new Business { Id = id };
+    }
+
+    // ✅ Update method to allow updating business details
+    public void Update(string name, string contactEmail, string phoneNumber, SubscriptionPlan subscriptionPlan)
+    {
+        Name = name ?? throw new ArgumentNullException(nameof(name));
+        ContactEmail = contactEmail ?? throw new ArgumentNullException(nameof(contactEmail));
+        PhoneNumber = phoneNumber ?? throw new ArgumentNullException(nameof(phoneNumber));
+
+        ChangeSubscription(subscriptionPlan);
+    }
+
+    public void UpgradeSubscription(SubscriptionPlan newPlan)
+    {
+        ChangeSubscription(newPlan);
+    }
+
+    public void DowngradeSubscription(SubscriptionPlan newPlan)
+    {
+        ChangeSubscription(newPlan);
+    }
+
+    private void ChangeSubscription(SubscriptionPlan newPlan)
+    {
+        if (newPlan == null) throw new ArgumentNullException(nameof(newPlan));
+
+        SubscriptionPlan = newPlan;
+        SubscriptionPlanId = newPlan.Id;
+        SubscriptionStartDate = DateTime.UtcNow;
+        SubscriptionEndDate = DateTime.UtcNow.AddMonths(1); // Restart billing cycle
     }
 }
-

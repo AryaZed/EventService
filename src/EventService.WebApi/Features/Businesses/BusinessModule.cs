@@ -12,7 +12,7 @@ public class BusinessModule : ICarterModule
 
         group.MapPost("/", async (IBusinessRepository repo, BusinessRequest request) =>
         {
-            var business = Business.Create(request.Name, request.ContactEmail, request.PhoneNumber);
+            var business = Business.Create(request.Name, request.ContactEmail, request.PhoneNumber, request.SubscriptionPlan);
             await repo.AddAsync(business);
             return Results.Created($"/api/businesses/{business.Id}", BusinessResponse.FromEntity(business));
         });
@@ -34,7 +34,7 @@ public class BusinessModule : ICarterModule
             var existingBusiness = await repo.GetByIdAsync(id);
             if (existingBusiness is null) return Results.NotFound();
 
-            existingBusiness = Business.Create(request.Name, request.ContactEmail, request.PhoneNumber);
+            existingBusiness = Business.Create(request.Name, request.ContactEmail, request.PhoneNumber, request.SubscriptionPlan);
             await repo.UpdateAsync(existingBusiness);
             return Results.NoContent();
         });

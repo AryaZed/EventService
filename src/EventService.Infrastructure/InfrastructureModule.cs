@@ -1,7 +1,9 @@
 ﻿using EventService.Application.Interfaces.Repositories;
 using EventService.Application.Interfaces.Services.Notifications;
+using EventService.Application.Interfaces.Services.Payments;
 using EventService.Application.Services.Events;
 using EventService.Application.Services.Notifications;
+using EventService.Application.Services.Payments;
 using EventService.Infrastructure.Configurations;
 using EventService.Infrastructure.Consumers.Events;
 using EventService.Infrastructure.Persistence;
@@ -11,6 +13,7 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace EventService.Infrastructure;
 
@@ -27,6 +30,8 @@ public static class InfrastructureModule
         services.AddScoped<IEventRepository, EventRepository>();
         services.AddScoped<IEventProcessor, EventProcessor>();
         services.AddScoped<INotificationService, SmsNotificationService>();
+        services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
+        services.AddScoped<IInvoiceRepository, InvoiceRepository>();
 
         var rabbitMQOptions = new RabbitMQOptions();
         configuration.GetSection("RabbitMQ").Bind(rabbitMQOptions);

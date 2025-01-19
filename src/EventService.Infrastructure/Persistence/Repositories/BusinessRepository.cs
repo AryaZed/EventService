@@ -45,4 +45,11 @@ public class BusinessRepository : IBusinessRepository
             await _context.SaveChangesAsync();
         }
     }
+
+    public async Task<List<Business>> GetExpiredSubscriptionsAsync()
+    {
+        return await _context.Businesses
+            .Where(b => b.SubscriptionEndDate < DateTime.UtcNow)
+            .ToListAsync();
+    }
 }

@@ -20,6 +20,7 @@ public class Event
     public Guid BusinessId { get; private set; }
     public Business Business { get; private set; }
     public string TargetRulesJson { get; private set; } // Stores dynamic conditions as JSON
+    public List<EventRule> EventRules { get; private set; }
 
     private Event() { }
 
