@@ -15,4 +15,5 @@ public interface IBusinessRepository
     Task UpdateAsync(Business business);
     Task DeleteAsync(Guid id);
     Task<List<Business>> GetExpiredSubscriptionsAsync();
+    Task<Business?> GetBusinessByTenantAsync(Guid tenantId);
 }

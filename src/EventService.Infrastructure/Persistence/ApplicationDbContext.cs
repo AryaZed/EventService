@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using MassTransit.Courier.Contracts;
 using EventService.Domain.Entities.Notifications;
+using EventService.Domain.Entities.Analytics;
 
 namespace EventService.Infrastructure.Persistence;
 
@@ -26,6 +27,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<SubscriptionPlan> SubscriptionPlans { get; set; } // ✅ Payment Plans
     public DbSet<Invoice> Invoices { get; set; } // ✅ Billing & Payment Tracking
     public DbSet<AuditLog> AuditLogs { get; set; } // ✅ Compliance & Security Logs
+    public DbSet<EventAnalytics> EventAnalytics { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

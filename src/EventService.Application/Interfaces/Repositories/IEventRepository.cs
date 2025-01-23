@@ -15,4 +15,5 @@ public interface IEventRepository
     Task UpdateAsync(Event eventEntity);
     Task DeleteAsync(Guid id);
     Task<IEnumerable<Event>> GetScheduledEventsAsync(DateTime scheduledBefore);
+    Task<List<Event>> GetEventsByBusinessIdAsync(Guid businessId);
 }

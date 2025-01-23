@@ -1,4 +1,5 @@
 ﻿using EventService.Application.Interfaces.Repositories;
+using EventService.Application.Interfaces.Services.Caching;
 using EventService.Domain.Entities.Users;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -12,14 +13,29 @@ namespace EventService.Infrastructure.Persistence.Repositories;
 public class UserRepository : IUserRepository
 {
     private readonly ApplicationDbContext _context;
+    private readonly ICacheService _cacheService;
 
-    public UserRepository(ApplicationDbContext context)
+    public UserRepository(ApplicationDbContext context, ICacheService cacheService)
     {
         _context = context;
+        _cacheService = cacheService;
     }
 
-    public async Task<List<User>> GetAllByBusinessIdAsync(Guid businessId) =>
-        await _context.Users.Where(u => u.BusinessId == businessId).ToListAsync();
+    public async Task<List<User>> GetAllByBusinessIdAsync(Guid businessId)
+    {
+        var cacheKey = $"users:{businessId}";
+        var cachedUsers = await _cacheService.GetAsync<List<User>>(cacheKey);
+        if (cachedUsers is not null)
+            return cachedUsers;
+
+        var users = await _context.Users.Where(u => u.BusinessId == businessId).ToListAsync();
+        if (users.Any())
+        {
+            await _cacheService.SetAsync(cacheKey, users, TimeSpan.FromMinutes(15)); // Cache for 15 min
+        }
+
+        return users;
+    }
 
     public async Task<List<User>> GetUsersJoinedAfterAsync(Guid businessId, DateTime date) =>
         await _context.Users.Where(u => u.BusinessId == businessId && u.CreatedAt >= date).ToListAsync();
@@ -43,6 +59,7 @@ public class UserRepository : IUserRepository
     {
         _context.Users.Update(user);
         await _context.SaveChangesAsync();
+        await _cacheService.RemoveAsync($"users:{user.BusinessId}"); // ✅ Invalidate Cache
     }
 
     public async Task DeleteAsync(Guid id)

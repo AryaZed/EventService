@@ -17,10 +17,15 @@ public class BusinessModule : ICarterModule
             return Results.Created($"/api/businesses/{business.Id}", BusinessResponse.FromEntity(business));
         });
 
-        group.MapGet("/", async (IBusinessRepository repo) =>
+        group.MapGet("/", async (IBusinessRepository repo, HttpContext context) =>
         {
-            var businesses = await repo.GetAllAsync();
-            return Results.Ok(businesses.Select(BusinessResponse.FromEntity));
+            if (context.Items["TenantId"] is not string tenantIdString || !Guid.TryParse(tenantIdString, out var tenantId))
+            {
+                return Results.BadRequest("Tenant ID is missing or invalid.");
+            }
+
+            var business = await repo.GetBusinessByTenantAsync(tenantId);
+            return business is not null ? Results.Ok(BusinessResponse.FromEntity(business)) : Results.NotFound();
         });
 
         group.MapGet("/{id:guid}", async (IBusinessRepository repo, Guid id) =>

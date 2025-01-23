@@ -7,8 +7,8 @@ public class Webhook
     public Guid Id { get; private set; } = Guid.CreateVersion7();
     public Guid BusinessId { get; private set; }
     public string Url { get; private set; }
-    public string SecretKey { get; private set; }
-    public string EventType { get; private set; } // "event.created", "event.updated"
+    public string SecretKey { get; private set; } // ✅ Used for HMAC verification
+    public string EventType { get; private set; }
     public Business Business { get; private set; }
 
     private Webhook() { }
@@ -17,7 +17,17 @@ public class Webhook
     {
         BusinessId = businessId;
         Url = url;
-        SecretKey = secretKey;
+        SecretKey = secretKey; // ✅ Generate per webhook
         EventType = eventType;
+    }
+
+    public void Update(string url, string eventType, string? secretKey = null)
+    {
+        Url = url;
+        EventType = eventType;
+        if (!string.IsNullOrEmpty(secretKey))
+        {
+            SecretKey = secretKey; // ✅ Allow secret rotation
+        }
     }
 }

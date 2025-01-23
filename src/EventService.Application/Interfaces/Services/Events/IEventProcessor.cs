@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace EventService.Application.Services.Events;
+namespace EventService.Application.Interfaces.Services.Events;
 
 public interface IEventProcessor
 {

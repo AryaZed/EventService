@@ -7,6 +7,9 @@ public class SubscriptionPlan
     public int MaxEventsPerMonth { get; private set; }
     public decimal Price { get; private set; }
 
+    public int MaxRequestsPerMinute { get; private set; }
+    public int MaxRequestsPerHour { get; private set; }
+
     public Guid? BusinessId { get; private set; } // ✅ Allow Global & Custom Plans
     public Business? Business { get; private set; }
 

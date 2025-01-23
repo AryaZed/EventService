@@ -1,4 +1,5 @@
 ﻿using EventService.Application.Interfaces.Repositories;
+using EventService.Application.Interfaces.Services.Caching;
 using EventService.Domain.Entities.Businesses;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -12,10 +13,12 @@ namespace EventService.Infrastructure.Persistence.Repositories;
 public class BusinessRepository : IBusinessRepository
 {
     private readonly ApplicationDbContext _context;
+    private readonly ICacheService _cacheService;
 
-    public BusinessRepository(ApplicationDbContext context)
+    public BusinessRepository(ApplicationDbContext context, ICacheService cacheService)
     {
         _context = context;
+        _cacheService = cacheService;
     }
 
     public async Task<IEnumerable<Business>> GetAllAsync() =>
@@ -34,6 +37,7 @@ public class BusinessRepository : IBusinessRepository
     {
         _context.Businesses.Update(business);
         await _context.SaveChangesAsync();
+        await _cacheService.RemoveAsync($"business:{business.Id}"); // ✅ Invalidate Cache
     }
 
     public async Task DeleteAsync(Guid id)
@@ -51,5 +55,21 @@ public class BusinessRepository : IBusinessRepository
         return await _context.Businesses
             .Where(b => b.SubscriptionEndDate < DateTime.UtcNow)
             .ToListAsync();
+    }
+
+    public async Task<Business?> GetBusinessByTenantAsync(Guid tenantId)
+    {
+        var cacheKey = $"business:{tenantId}";
+        var cachedBusiness = await _cacheService.GetAsync<Business>(cacheKey);
+        if (cachedBusiness is not null)
+            return cachedBusiness;
+
+        var business = await _context.Businesses.FirstOrDefaultAsync(b => b.Id == tenantId);
+        if (business is not null)
+        {
+            await _cacheService.SetAsync(cacheKey, business, TimeSpan.FromMinutes(30)); // Cache for 30 min
+        }
+
+        return business;
     }
 }

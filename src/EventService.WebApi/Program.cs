@@ -26,16 +26,19 @@ Log.Logger = new LoggerConfiguration()
         AutoRegisterTemplate = true,
         IndexFormat = "eventservice-logs-{0:yyyy.MM}"
     })
+    .Enrich.WithProperty("Service", "Event Processing")
     .CreateLogger();
 
 builder.Host.UseSerilog();
 
 // ✅ Add Middleware Dependencies
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<TenantMiddleware>();
 builder.Services.AddMemoryCache();
 builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
+builder.Services.Configure<IpRateLimitPolicies>(builder.Configuration.GetSection("IpRateLimitPolicies"));
 builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+builder.Services.AddSingleton<IIpPolicyStore, MemoryCacheIpPolicyStore>();
+builder.Services.AddSingleton<IRateLimitCounterStore, MemoryCacheRateLimitCounterStore>();
 builder.Services.AddInMemoryRateLimiting();
 
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -127,6 +130,8 @@ app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseMiddleware<PerformanceMonitoringMiddleware>();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<TenantMiddleware>();
+app.UseMiddleware<RateLimitMiddleware>();
+app.UseMiddleware<WebhookVerificationMiddleware>();
 
 app.UseIpRateLimiting(); // ✅ Apply Rate Limiting
 
