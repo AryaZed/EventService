@@ -2,6 +2,7 @@
 using EventService.Application.Interfaces.Repositories;
 using EventService.Domain.Entities.Businesses;
 using EventService.Domain.Entities.Events;
+using EventService.Domain.Enums;
 using MassTransit;
 using System.Text.Json;
 
@@ -15,7 +16,7 @@ public class EventModule : ICarterModule
 
         group.MapPost("/", async (IPublishEndpoint publishEndpoint, EventRequest request) =>
         {
-            var eventEntity = Domain.Entities.Events.Event.Create(request.Title, request.Description, request.ScheduledAt, Business.CreateExisting(request.BusinessId), "{}");
+            var eventEntity = Domain.Entities.Events.Event.Create(request.Title, request.Description, request.ScheduledAt, Business.CreateExisting(request.BusinessId), "{}",request.Recurrence);
             await publishEndpoint.Publish(eventEntity);
 
             return Results.Accepted($"/api/events/{eventEntity.Id}", eventEntity);
@@ -39,7 +40,7 @@ public class EventModule : ICarterModule
             if (existingEvent is null) return Results.NotFound();
 
             string targetRulesJson = JsonSerializer.Serialize(request.TargetRules);
-            existingEvent = Domain.Entities.Events.Event.Create(request.Title, request.Description, request.ScheduledAt, Business.CreateExisting(request.BusinessId), targetRulesJson);
+            existingEvent = Domain.Entities.Events.Event.Create(request.Title, request.Description, request.ScheduledAt, Business.CreateExisting(request.BusinessId), targetRulesJson, request.Recurrence);
             await repo.UpdateAsync(existingEvent);
             return Results.NoContent();
         });

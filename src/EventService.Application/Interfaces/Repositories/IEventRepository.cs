@@ -16,4 +16,5 @@ public interface IEventRepository
     Task DeleteAsync(Guid id);
     Task<IEnumerable<Event>> GetScheduledEventsAsync(DateTime scheduledBefore);
     Task<List<Event>> GetEventsByBusinessIdAsync(Guid businessId, CancellationToken stoppingToken);
+    Task<IEnumerable<Event>> GetRecurringEventsAsync(DateTime now);
 }

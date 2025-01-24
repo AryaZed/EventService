@@ -1,11 +1,6 @@
 ﻿using EventService.Application.Interfaces.Repositories;
 using EventService.Domain.Entities.Analytics;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace EventService.Infrastructure.Persistence.Repositories
 {
@@ -35,6 +30,23 @@ namespace EventService.Infrastructure.Persistence.Repositories
         public async Task<List<EventAnalytics>> GetAllAsync()
         {
             return await _context.EventAnalytics.OrderByDescending(a => a.Timestamp).ToListAsync();
+        }
+
+        public async Task<List<EventAnalytics>> GetPastEventAnalyticsAsync(Guid businessId)
+        {
+            return await _context.EventAnalytics
+                .Where(a => a.Event.BusinessId == businessId)
+                .OrderByDescending(a => a.Timestamp)
+                .ToListAsync();
+        }
+
+        public async Task<Dictionary<Guid, double>> GetUserEngagementScoresAsync(Guid businessId)
+        {
+            return await _context.EventAnalytics
+                .Where(a => a.Event.BusinessId == businessId)
+                .GroupBy(a => a.EventId)
+                .Select(g => new { EventId = g.Key, Score = g.Average(a => a.EngagementScore) })
+                .ToDictionaryAsync(e => e.EventId, e => e.Score);
         }
     }
 }

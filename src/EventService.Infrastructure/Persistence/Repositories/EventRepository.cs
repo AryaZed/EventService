@@ -103,5 +103,12 @@ namespace EventService.Infrastructure.Persistence.Repositories
 
             return events;
         }
+
+        public async Task<IEnumerable<Event>> GetRecurringEventsAsync(DateTime scheduledBefore)
+        {
+            return await _context.Events
+                .Where(e => e.ScheduledAt <= scheduledBefore && e.Recurrence != null)
+                .ToListAsync();
+        }
     }
 }

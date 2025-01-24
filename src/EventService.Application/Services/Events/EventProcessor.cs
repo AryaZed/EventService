@@ -3,11 +3,13 @@ using EventService.Application.Interfaces.Services.Caching;
 using EventService.Application.Interfaces.Services.Events;
 using EventService.Application.Interfaces.Services.Integrations;
 using EventService.Application.Interfaces.Services.Notifications;
+using EventService.Application.Models.ML;
 using EventService.Domain.Entities.Analytics;
 using EventService.Domain.Entities.Events;
 using EventService.Domain.Entities.Users;
 using MassTransit;
 using Microsoft.Extensions.Logging;
+using Microsoft.ML;
 using Polly;
 using System.Diagnostics;
 
@@ -77,6 +79,100 @@ public class EventProcessor : IEventProcessor
         }
     }
 
+    public async Task ProcessRecurringEventsAsync()
+    {
+        var now = DateTime.UtcNow;
+        var recurringEvents = await _eventRepository.GetRecurringEventsAsync(now);
+
+        foreach (var eventEntity in recurringEvents)
+        {
+            var nextOccurrence = eventEntity.GetNextOccurrence();
+            if (nextOccurrence is null) continue;
+
+            var newEvent = Domain.Entities.Events.Event.Create(
+                eventEntity.Title,
+                eventEntity.Description,
+                eventEntity.ScheduledAt,
+                eventEntity.Business,
+                eventEntity.TargetRulesJson,
+                eventEntity.Recurrence
+            );
+
+            await _eventRepository.AddAsync(newEvent);
+            _logger.LogInformation("📅 Created next occurrence for event {EventId}: {NextDate}", eventEntity.Id, nextOccurrence);
+        }
+    }
+
+    public async Task<DateTime> PredictOptimalEventTime(Guid businessId)
+    {
+        var pastEvents = await _analyticsRepository.GetPastEventAnalyticsAsync(businessId);
+        if (!pastEvents.Any()) return DateTime.UtcNow.AddHours(1); // Default if no data
+
+        // ✅ Extract the hour from the Timestamp field (when events were processed)
+        var peakHour = pastEvents
+            .GroupBy(e => e.Timestamp.Hour) // ✅ Group by hour of the day
+            .Select(group => new
+            {
+                Hour = group.Key, // ✅ This is the actual hour (0-23)
+                AverageEngagement = group.Average(e => e.EngagementScore)
+            })
+            .OrderByDescending(e => e.AverageEngagement)
+            .FirstOrDefault()?.Hour;
+
+        return peakHour.HasValue
+            ? DateTime.UtcNow.Date.AddHours(peakHour.Value)  // ✅ Corrected to use Hour
+            : DateTime.UtcNow.AddHours(1);  // Default fallback
+    }
+
+    public async Task TrainEventPredictionModel()
+    {
+        var allEventData = await _analyticsRepository.GetAllEventAnalyticsAsync();
+        if (!allEventData.Any()) return;
+
+        var trainingData = allEventData.Select(e => new EventPredictionData
+        {
+            ProcessedUsers = e.ProcessedUsers,
+            SuccessCount = e.SuccessCount,
+            FailureCount = e.FailureCount,
+            ProcessingDuration = (float)e.ProcessingDuration.TotalSeconds,
+            EngagementScore = (float)e.EngagementScore
+        }).ToList();
+
+        var model = TrainModel(trainingData);
+        SaveModel(model);
+    }
+
+    private ITransformer TrainModel(List<EventPredictionData> trainingData)
+    {
+        var mlContext = new MLContext();
+
+        var dataView = mlContext.Data.LoadFromEnumerable(trainingData);
+
+        var pipeline = mlContext.Transforms.Concatenate("Features", nameof(EventPredictionData.ProcessedUsers),
+                nameof(EventPredictionData.SuccessCount), nameof(EventPredictionData.FailureCount),
+                nameof(EventPredictionData.ProcessingDuration))
+            .Append(mlContext.Regression.Trainers.FastTree(labelColumnName: "EngagementScore"));
+
+        var model = pipeline.Fit(dataView);
+        return model;
+    }
+
+    // ✅ Define Save Model Function
+    private void SaveModel(ITransformer model)
+    {
+        var mlContext = new MLContext();
+        string modelPath = "event_prediction_model.zip";
+        mlContext.Model.Save(model, null, modelPath);
+    }
+
+    private async Task<DateTime> PredictBestNotificationTime(Guid userId)
+    {
+        var userEngagement = await _analyticsRepository.GetUserEngagementHistoryAsync(userId);
+        if (!userEngagement.Any()) return DateTime.UtcNow;
+
+        return userEngagement.OrderByDescending(e => e.EngagementScore).First().Timestamp;
+    }
+
     private async Task<bool> SendNotificationAsync(User user, Domain.Entities.Events.Event eventEntity)
     {
         var message = $"🔔 Event Reminder: {eventEntity.Title} is scheduled for {eventEntity.ScheduledAt:yyyy-MM-dd HH:mm}.";
@@ -122,34 +218,47 @@ public class EventProcessor : IEventProcessor
     private async Task<List<User>> GetTargetUsers(Domain.Entities.Events.Event eventEntity)
     {
         var rules = eventEntity.GetTargetRules();
+        var filteredUsers = new HashSet<User>(); // ✅ Prevents duplicates
 
+        // ✅ If sending to all users, fetch them directly
         if (rules.SendToAllUsers)
         {
             return await _userRepository.GetAllByBusinessIdAsync(eventEntity.BusinessId);
         }
 
-        var filteredUsers = new List<User>();
-
+        // ✅ Filter users who joined in the last X days
         if (rules.UserJoinedInLastDays.HasValue)
         {
             var minDate = DateTime.UtcNow.AddDays(-rules.UserJoinedInLastDays.Value);
             var newUsers = await _userRepository.GetUsersJoinedAfterAsync(eventEntity.BusinessId, minDate);
-            filteredUsers.AddRange(newUsers);
+            foreach (var user in newUsers) filteredUsers.Add(user);
         }
 
-        if (rules.SpecificUserIds is not null)
+        // ✅ Filter specific users by ID
+        if (rules.SpecificUserIds is not null && rules.SpecificUserIds.Any())
         {
             var specificUsers = await _userRepository.GetUsersByIdsAsync(rules.SpecificUserIds);
-            filteredUsers.AddRange(specificUsers);
+            foreach (var user in specificUsers) filteredUsers.Add(user);
         }
 
-        if (rules.TargetUserGroups is not null)
+        // ✅ Filter users based on targeted groups
+        if (rules.TargetUserGroups is not null && rules.TargetUserGroups.Any())
         {
             var groupUsers = await _userRepository.GetUsersByGroupIdsAsync(rules.TargetUserGroups);
-            filteredUsers.AddRange(groupUsers);
+            foreach (var user in groupUsers) filteredUsers.Add(user);
         }
 
-        return filteredUsers.Distinct().ToList();
-    }
+        // ✅ Get all business users for engagement scoring (if needed)
+        var users = filteredUsers.Any()
+            ? filteredUsers.ToList() // Use only filtered users
+            : await _userRepository.GetAllByBusinessIdAsync(eventEntity.BusinessId); // Default fallback
 
+        // ✅ Get engagement scores
+        var engagedUsers = await _analyticsRepository.GetUserEngagementScoresAsync(eventEntity.BusinessId);
+
+        // ✅ Sort users by engagement score (descending)
+        var sortedUsers = users.OrderByDescending(u => engagedUsers.ContainsKey(u.Id) ? engagedUsers[u.Id] : 0).ToList();
+
+        return sortedUsers;
+    }
 }

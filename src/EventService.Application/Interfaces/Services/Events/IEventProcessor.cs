@@ -9,4 +9,6 @@ namespace EventService.Application.Interfaces.Services.Events;
 public interface IEventProcessor
 {
     Task ProcessScheduledEventsAsync();
+    Task ProcessRecurringEventsAsync();
+    Task<DateTime> PredictOptimalEventTime(Guid businessId);
 }

@@ -65,6 +65,7 @@ namespace EventService.Workers.Services.Events
                         var eventProcessor = scope.ServiceProvider.GetRequiredService<IEventProcessor>();
 
                         // ✅ RetryPolicy runs inside CircuitBreaker
+                        await RetryPolicy.ExecuteAsync(() => eventProcessor.ProcessRecurringEventsAsync());
                         await RetryPolicy.ExecuteAsync(() => eventProcessor.ProcessScheduledEventsAsync());
                     });
                 }
