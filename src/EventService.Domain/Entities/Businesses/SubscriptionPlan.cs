@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text.Json.Serialization;
 using EventService.Domain.Entities.Businesses;
 
 namespace EventService.Domain.Entities.Businesses
@@ -20,6 +21,7 @@ namespace EventService.Domain.Entities.Businesses
 
         private SubscriptionPlan() { } // Required for EF Core
 
+        [JsonConstructor]
         public SubscriptionPlan(string name, int maxEvents, decimal price, int maxRequestsPerMinute, int maxRequestsPerHour, Business? business = null)
         {
             Name = name;

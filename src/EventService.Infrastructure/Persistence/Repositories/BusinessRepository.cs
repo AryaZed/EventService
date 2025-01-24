@@ -64,7 +64,10 @@ public class BusinessRepository : IBusinessRepository
         if (cachedBusiness is not null)
             return cachedBusiness;
 
-        var business = await _context.Businesses.FirstOrDefaultAsync(b => b.Id == tenantId);
+        var business = await _context.Businesses
+            .Include(i => i.SubscriptionPlan)
+            .FirstOrDefaultAsync(b => b.Id == tenantId);
+
         if (business is not null)
         {
             await _cacheService.SetAsync(cacheKey, business, TimeSpan.FromMinutes(30)); // Cache for 30 min
