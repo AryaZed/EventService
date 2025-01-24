@@ -1,5 +1,8 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using System;
 using System.Net;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -11,16 +14,16 @@ namespace EventService.WebApi.Middleware
     public class RateLimitMiddleware
     {
         private readonly RequestDelegate _next;
-        private readonly IBusinessRepository _businessRepository;
-        private readonly IRateLimitStore _rateLimitStore;
+        private readonly IServiceScopeFactory _scopeFactory; // ✅ Use Scope Factory
         private readonly IConfiguration _configuration;
+        private readonly ILogger<RateLimitMiddleware> _logger;
 
-        public RateLimitMiddleware(RequestDelegate next, IBusinessRepository businessRepository, IRateLimitStore rateLimitStore, IConfiguration configuration)
+        public RateLimitMiddleware(RequestDelegate next, IServiceScopeFactory scopeFactory, IConfiguration configuration, ILogger<RateLimitMiddleware> logger)
         {
             _next = next;
-            _businessRepository = businessRepository;
-            _rateLimitStore = rateLimitStore;
+            _scopeFactory = scopeFactory;
             _configuration = configuration;
+            _logger = logger;
         }
 
         public async Task Invoke(HttpContext context)
@@ -31,7 +34,11 @@ namespace EventService.WebApi.Middleware
                 return;
             }
 
-            var business = await _businessRepository.GetBusinessByTenantAsync(tenantId);
+            using var scope = _scopeFactory.CreateScope(); // ✅ Fix: Use Scoped Dependency
+            var businessRepository = scope.ServiceProvider.GetRequiredService<IBusinessRepository>();
+            var rateLimitStore = scope.ServiceProvider.GetRequiredService<IRateLimitStore>();
+
+            var business = await businessRepository.GetBusinessByTenantAsync(tenantId);
             if (business == null)
             {
                 await HandleRateLimitExceeded(context, "Business not found.");
@@ -41,7 +48,14 @@ namespace EventService.WebApi.Middleware
             var subscriptionPlan = business.SubscriptionPlan?.Name ?? "Free";
             var rateLimits = _configuration.GetSection($"SubscriptionPlans:{subscriptionPlan}").Get<RateLimitConfig>();
 
-            if (rateLimits == null || !await _rateLimitStore.IsAllowedAsync(tenantId, rateLimits.MaxRequestsPerMinute, rateLimits.MaxRequestsPerHour))
+            if (rateLimits == null)
+            {
+                _logger.LogWarning("🚨 Rate limit configuration missing for plan: {Plan}", subscriptionPlan);
+                await HandleRateLimitExceeded(context, "Rate limit configuration missing.");
+                return;
+            }
+
+            if (!await rateLimitStore.IsAllowedAsync(tenantId, rateLimits.MaxRequestsPerMinute, rateLimits.MaxRequestsPerHour))
             {
                 await HandleRateLimitExceeded(context, "Rate limit exceeded. Upgrade your subscription.");
                 return;

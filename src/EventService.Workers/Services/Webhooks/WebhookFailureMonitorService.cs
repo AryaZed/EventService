@@ -23,32 +23,44 @@ namespace EventService.Workers.Services.Webhooks
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                using var scope = _scopeFactory.CreateScope();
-                var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
-                var webhookRepository = scope.ServiceProvider.GetRequiredService<IWebhookRepository>();
-                var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
-
-                _logger.LogInformation("🔍 Checking webhook failure counts...");
-
-                var failedWebhookKeys = await cacheService.GetKeysAsync("failures:webhook:*");
-
-                foreach (var key in failedWebhookKeys)
+                try
                 {
-                    var failureCount = await cacheService.GetAsync<int>(key);
-                    if (failureCount >= 5) // Threshold: 5 failed attempts
+                    using var scope = _scopeFactory.CreateScope();
+                    var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
+                    var webhookRepository = scope.ServiceProvider.GetRequiredService<IWebhookRepository>();
+                    var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
+
+                    _logger.LogInformation("🔍 Checking webhook failure counts...");
+
+                    var failedWebhookKeys = await cacheService.GetKeysAsync("failures:webhook:*");
+
+                    foreach (var key in failedWebhookKeys)
                     {
-                        var webhookId = key.Split(':').Last();
-                        var webhook = await webhookRepository.GetByIdAsync(Guid.Parse(webhookId));
-                        if (webhook != null)
+                        var failureCount = await cacheService.GetAsync<int>(key);
+                        if (failureCount >= 5) // Threshold: 5 failed attempts
                         {
-                            var alertMessage = $"🚨 Alert! Webhook {webhook.Url} has failed {failureCount} times.";
-                            await notificationService.SendSmsAsync(webhook.Business.ContactEmail, alertMessage);
-                            await cacheService.RemoveAsync(key); // Reset failure counter after alert
+                            var webhookId = key.Split(':').Last();
+                            var webhook = await webhookRepository.GetByIdAsync(Guid.Parse(webhookId));
+                            if (webhook != null)
+                            {
+                                var alertMessage = $"🚨 Alert! Webhook {webhook.Url} has failed {failureCount} times.";
+                                await notificationService.SendSmsAsync(webhook.Business.ContactEmail, alertMessage);
+                                await cacheService.RemoveAsync(key); // Reset failure counter after alert
+                            }
                         }
                     }
-                }
 
-                await Task.Delay(MonitorInterval, stoppingToken);
+                    await Task.Delay(MonitorInterval, stoppingToken);
+                }
+                catch (TaskCanceledException) // ✅ Handle Task Cancellation
+                {
+                    _logger.LogWarning("🚨 Task was canceled: Webhook Failure Monitor stopping.");
+                    break; // ✅ Exit loop gracefully
+                }
+                catch (Exception ex) // ✅ Handle Other Exceptions
+                {
+                    _logger.LogError(ex, "❌ Unexpected error in Webhook Failure Monitor Service.");
+                }
             }
         }
     }

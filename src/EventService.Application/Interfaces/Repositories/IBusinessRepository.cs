@@ -9,7 +9,7 @@ namespace EventService.Application.Interfaces.Repositories;
 
 public interface IBusinessRepository
 {
-    Task<IEnumerable<Business>> GetAllAsync();
+    Task<IEnumerable<Business>> GetAllAsync(CancellationToken stoppingToken);
     Task<Business?> GetByIdAsync(Guid id);
     Task AddAsync(Business business);
     Task UpdateAsync(Business business);

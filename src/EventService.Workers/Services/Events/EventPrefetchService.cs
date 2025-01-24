@@ -4,9 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace EventService.Workers.Services.Events
@@ -25,27 +24,62 @@ namespace EventService.Workers.Services.Events
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            while (!stoppingToken.IsCancellationRequested)
+            _logger.LogInformation("🚀 Event Prefetch Service Started.");
+
+            try
             {
-                using var scope = _serviceScopeFactory.CreateScope();
-                var businessRepository = scope.ServiceProvider.GetRequiredService<IBusinessRepository>();
-                var eventRepository = scope.ServiceProvider.GetRequiredService<IEventRepository>();
-                var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
-
-                var businesses = await businessRepository.GetAllAsync();
-                foreach (var business in businesses)
+                while (!stoppingToken.IsCancellationRequested)
                 {
-                    var events = await eventRepository.GetEventsByBusinessIdAsync(business.Id);
-                    var upcomingEvents = events.Where(e => e.ScheduledAt >= DateTime.UtcNow)
-                                               .OrderBy(e => e.ScheduledAt)
-                                               .Take(5)
-                                               .ToList();
+                    _logger.LogInformation("🔍 Checking for upcoming events...");
 
-                    await cacheService.SetAsync($"events:upcoming:{business.Id}", upcomingEvents, TimeSpan.FromMinutes(5));
+                    using var scope = _serviceScopeFactory.CreateScope();
+                    var businessRepository = scope.ServiceProvider.GetRequiredService<IBusinessRepository>();
+                    var eventRepository = scope.ServiceProvider.GetRequiredService<IEventRepository>();
+                    var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
+
+                    try
+                    {
+                        var businesses = await businessRepository.GetAllAsync(stoppingToken); // ✅ Pass CancellationToken
+
+                        foreach (var business in businesses)
+                        {
+                            if (stoppingToken.IsCancellationRequested) return; // ✅ Stop immediately if requested
+
+                            var events = await eventRepository.GetEventsByBusinessIdAsync(business.Id, stoppingToken);
+                            var upcomingEvents = events.Where(e => e.ScheduledAt >= DateTime.UtcNow)
+                                                       .OrderBy(e => e.ScheduledAt)
+                                                       .Take(5)
+                                                       .ToList();
+
+                            await cacheService.SetAsync($"events:upcoming:{business.Id}", upcomingEvents, TimeSpan.FromMinutes(5));
+                        }
+
+                        _logger.LogInformation("✅ Event prefetching completed at {Time}", DateTime.UtcNow);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        _logger.LogWarning("⚠️ Event Prefetch Service is stopping due to cancellation.");
+                        break; // ✅ Gracefully exit loop
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "❌ Unexpected error while prefetching events.");
+                    }
+
+                    await Task.Delay(PrefetchInterval, stoppingToken); // ✅ Delay with proper cancellation support
                 }
-
-                _logger.LogInformation("Event prefetching completed at {Time}", DateTime.UtcNow);
-                await Task.Delay(PrefetchInterval, stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("⚠️ Event Prefetch Service was canceled.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Critical error in Event Prefetch Service.");
+            }
+            finally
+            {
+                _logger.LogInformation("🔴 Event Prefetch Service Stopped.");
             }
         }
     }

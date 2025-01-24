@@ -20,39 +20,67 @@ namespace EventService.Workers.Services.Webhooks
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            _logger.LogInformation("🔄 FailedWebhookProcessor started...");
+
             while (!stoppingToken.IsCancellationRequested)
             {
-                using var scope = _scopeFactory.CreateScope();
-                var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
-                var webhookService = scope.ServiceProvider.GetRequiredService<IWebhookService>();
-
-                var failedWebhookKeys = await cacheService.GetKeysAsync("dlq:webhooks:*");
-
-                foreach (var key in failedWebhookKeys)
+                try
                 {
-                    var webhookPayload = await cacheService.GetAsync<string>(key);
-                    if (string.IsNullOrEmpty(webhookPayload)) continue;
+                    using var scope = _scopeFactory.CreateScope();
+                    var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
+                    var webhookService = scope.ServiceProvider.GetRequiredService<IWebhookService>();
 
-                    try
+                    var failedWebhookKeys = await cacheService.GetKeysAsync("dlq:webhooks:*");
+
+                    foreach (var key in failedWebhookKeys)
                     {
-                        var webhook = JsonSerializer.Deserialize<WebhookRetryPayload>(webhookPayload);
-                        if (webhook == null) continue;
+                        var webhookPayload = await cacheService.GetAsync<string>(key);
+                        if (string.IsNullOrEmpty(webhookPayload)) continue;
 
-                        var isSuccess = await webhookService.SendWebhookAsync(webhook.WebhookId, webhook.Payload);
-                        if (isSuccess)
+                        try
                         {
-                            await cacheService.RemoveAsync(key);
-                            _logger.LogInformation("✅ Successfully retried Webhook {WebhookId}", webhook.WebhookId);
+                            var webhook = JsonSerializer.Deserialize<WebhookRetryPayload>(webhookPayload);
+                            if (webhook == null) continue;
+
+                            var isSuccess = await webhookService.SendWebhookAsync(webhook.WebhookId, webhook.Payload);
+                            if (isSuccess)
+                            {
+                                await cacheService.RemoveAsync(key);
+                                _logger.LogInformation("✅ Successfully retried Webhook {WebhookId}", webhook.WebhookId);
+                            }
+                            else
+                            {
+                                _logger.LogWarning("❌ Webhook retry failed for {WebhookId}, keeping in DLQ", webhook.WebhookId);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "❌ Failed to retry Webhook {WebhookId}", key);
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "❌ Failed to retry Webhook {WebhookId}", key);
-                    }
+                }
+                catch (TaskCanceledException)
+                {
+                    _logger.LogWarning("🛑 Task canceled: FailedWebhookProcessor is shutting down.");
+                    break; // Exit the loop gracefully
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "🚨 Unexpected error in FailedWebhookProcessor");
                 }
 
-                await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+                try
+                {
+                    await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+                }
+                catch (TaskCanceledException)
+                {
+                    _logger.LogWarning("🛑 Delay interrupted: FailedWebhookProcessor stopping.");
+                    break;
+                }
             }
+
+            _logger.LogInformation("🛑 FailedWebhookProcessor stopped.");
         }
     }
 

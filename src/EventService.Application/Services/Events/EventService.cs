@@ -20,7 +20,7 @@ namespace EventService.Application.Services.Events
             _cacheService = cacheService;
         }
 
-        public async Task<List<Event>> GetEventsWithPrefetching(Guid businessId)
+        public async Task<List<Event>> GetEventsWithPrefetching(Guid businessId, CancellationToken stoppingToken)
         {
             // ✅ Prefetch top 5 upcoming events for this business
             var upcomingEventsKey = $"events:upcoming:{businessId}";
@@ -28,7 +28,7 @@ namespace EventService.Application.Services.Events
 
             if (cachedUpcomingEvents is null)
             {
-                var allEvents = await _eventRepository.GetEventsByBusinessIdAsync(businessId);
+                var allEvents = await _eventRepository.GetEventsByBusinessIdAsync(businessId,stoppingToken);
                 var upcomingEvents = allEvents.Where(e => e.ScheduledAt >= DateTime.UtcNow)
                                               .OrderBy(e => e.ScheduledAt)
                                               .Take(5)

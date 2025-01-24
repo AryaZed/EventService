@@ -11,6 +11,8 @@ using AspNetCoreRateLimit;
 using EventService.WebApi.Middleware;
 using EventService.Application.Interfaces.Services.Payments;
 using EventService.Application.Services.Payments;
+using EventService.WebApi.Swagger;
+using EventService.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -90,32 +92,32 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo { Title = "Event Service API", Version = "v1" });
-    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    options.AddSecurityDefinition("X-Tenant-Id", new OpenApiSecurityScheme
     {
-        Name = "Authorization",
-        Type = SecuritySchemeType.Http,
-        Scheme = "Bearer",
-        BearerFormat = "JWT",
+        Name = "X-Tenant-Id",
+        Type = SecuritySchemeType.ApiKey,
         In = ParameterLocation.Header,
-        Description = "Enter 'Bearer {token}'"
+        Description = "Tenant ID required for multi-tenant operations",
     });
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            new string[] {}
-        }
-    });
+
+    options.OperationFilter<SwaggerTenantHeaderFilter>();
 });
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<ApplicationDbContext>();
+        await context.MigrateAndSeedAsync();
+    }
+    catch (Exception ex)
+    {
+        throw;
+    }
+}
 
 // Enable Swagger UI
 if (app.Environment.IsDevelopment())

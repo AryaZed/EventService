@@ -20,6 +20,8 @@ public class Business
     public DateTime SubscriptionStartDate { get; private set; }
     public DateTime SubscriptionEndDate { get; private set; }
 
+    public List<SubscriptionPlan> CreatedSubscriptionPlans { get; private set; } = new();
+
     private Business() { }
 
     public Business(string name, string contactEmail, string phoneNumber, SubscriptionPlan subscriptionPlan)

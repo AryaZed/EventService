@@ -85,7 +85,7 @@ namespace EventService.Infrastructure.Persistence.Repositories
             return events;
         }
 
-        public async Task<List<Event>> GetEventsByBusinessIdAsync(Guid businessId)
+        public async Task<List<Event>> GetEventsByBusinessIdAsync(Guid businessId, CancellationToken stoppingToken)
         {
             var cacheKey = $"events:{businessId}";
             var cachedEvents = await _cacheService.GetAsync<List<Event>>(cacheKey);
@@ -95,7 +95,7 @@ namespace EventService.Infrastructure.Persistence.Repositories
             var events = await _context.Events
                                        .Where(e => e.BusinessId == businessId)
                                        .OrderBy(e => e.ScheduledAt)
-                                       .ToListAsync();
+                                       .ToListAsync(stoppingToken);
             if (events.Any())
             {
                 await _cacheService.SetAsync(cacheKey, events, TimeSpan.FromMinutes(10)); // ✅ Cache for 10 min

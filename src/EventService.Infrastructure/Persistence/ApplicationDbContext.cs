@@ -47,4 +47,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             modelBuilder.Entity<Invoice>().HasQueryFilter(i => i.BusinessId == parsedTenantId);
         }
     }
+
+    public async Task MigrateAndSeedAsync()
+    {
+        await Database.MigrateAsync();
+        await ApplicationDbContextSeed.SeedAsync(this);
+    }
 }

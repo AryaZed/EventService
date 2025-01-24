@@ -21,8 +21,8 @@ public class BusinessRepository : IBusinessRepository
         _cacheService = cacheService;
     }
 
-    public async Task<IEnumerable<Business>> GetAllAsync() =>
-        await _context.Businesses.ToListAsync();
+    public async Task<IEnumerable<Business>> GetAllAsync(CancellationToken stoppingToken) =>
+        await _context.Businesses.ToListAsync(stoppingToken);
 
     public async Task<Business?> GetByIdAsync(Guid id) =>
         await _context.Businesses.FindAsync(id);

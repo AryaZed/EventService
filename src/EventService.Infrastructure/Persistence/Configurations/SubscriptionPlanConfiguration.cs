@@ -21,10 +21,15 @@ public class SubscriptionPlanConfiguration : IEntityTypeConfiguration<Subscripti
                .IsRequired()
                .HasColumnType("decimal(18,2)");
 
-        // ✅ If BusinessId is set, this SubscriptionPlan belongs to a specific Business
+        builder.Property(sp => sp.MaxRequestsPerMinute)
+               .IsRequired();
+
+        builder.Property(sp => sp.MaxRequestsPerHour)
+               .IsRequired();
+
         builder.HasOne(sp => sp.Business)
-               .WithOne(b => b.SubscriptionPlan)
-               .HasForeignKey<SubscriptionPlan>(sp => sp.BusinessId)
-               .OnDelete(DeleteBehavior.Cascade); // ✅ Delete SubscriptionPlan if Business is deleted
+                 .WithMany(b => b.CreatedSubscriptionPlans)
+                 .HasForeignKey(sp => sp.BusinessId)
+                 .OnDelete(DeleteBehavior.Restrict); // ✅ Prevents cascading delete
     }
 }

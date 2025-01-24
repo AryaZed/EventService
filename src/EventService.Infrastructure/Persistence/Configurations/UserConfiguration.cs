@@ -15,8 +15,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.CreatedAt).IsRequired();
 
         builder.HasOne(u => u.Business)
-            .WithMany()
-            .HasForeignKey(u => u.BusinessId)
-            .OnDelete(DeleteBehavior.Cascade);
+                   .WithMany(b => b.Users)
+                   .HasForeignKey(u => u.BusinessId)
+                   .OnDelete(DeleteBehavior.Cascade);
     }
 }

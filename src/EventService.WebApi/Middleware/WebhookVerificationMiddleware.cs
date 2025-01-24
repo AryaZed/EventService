@@ -1,6 +1,7 @@
 ﻿using EventService.Application.Interfaces.Repositories;
 using EventService.Application.Interfaces.Services.Caching;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Security.Cryptography;
 using System.Text;
@@ -12,19 +13,19 @@ namespace EventService.WebApi.Middleware
     {
         private readonly RequestDelegate _next;
         private readonly ILogger<WebhookVerificationMiddleware> _logger;
+        private readonly IServiceScopeFactory _scopeFactory; // ✅ Use Scope Factory
         private readonly ICacheService _cacheService;
-        private readonly IWebhookRepository _webhookRepository;
 
         public WebhookVerificationMiddleware(
             RequestDelegate next,
             ILogger<WebhookVerificationMiddleware> logger,
-            ICacheService cacheService,
-            IWebhookRepository webhookRepository)
+            IServiceScopeFactory scopeFactory, // ✅ Inject Scope Factory
+            ICacheService cacheService)
         {
             _next = next;
             _logger = logger;
+            _scopeFactory = scopeFactory;
             _cacheService = cacheService;
-            _webhookRepository = webhookRepository;
         }
 
         public async Task Invoke(HttpContext context)
@@ -37,7 +38,13 @@ namespace EventService.WebApi.Middleware
                 return;
             }
 
-            var secretKey = await GetWebhookSecretKeyAsync(webhookId);
+            string? secretKey;
+            using (var scope = _scopeFactory.CreateScope()) // ✅ Create Scoped Dependency
+            {
+                var webhookRepository = scope.ServiceProvider.GetRequiredService<IWebhookRepository>();
+                secretKey = await GetWebhookSecretKeyAsync(webhookId, webhookRepository);
+            }
+
             if (string.IsNullOrEmpty(secretKey))
             {
                 _logger.LogWarning("❌ Webhook ID {WebhookId} not found", webhookId);
@@ -73,7 +80,7 @@ namespace EventService.WebApi.Middleware
             return Convert.ToBase64String(hash);
         }
 
-        private async Task<string?> GetWebhookSecretKeyAsync(string webhookId)
+        private async Task<string?> GetWebhookSecretKeyAsync(string webhookId, IWebhookRepository webhookRepository)
         {
             var cacheKey = $"webhook-secret:{webhookId}";
 
@@ -86,7 +93,7 @@ namespace EventService.WebApi.Middleware
             }
 
             // 🔎 Fallback: Fetch from database if not in cache
-            var webhook = await _webhookRepository.GetByIdAsync(Guid.Parse(webhookId));
+            var webhook = await webhookRepository.GetByIdAsync(Guid.Parse(webhookId));
             if (webhook == null)
             {
                 _logger.LogWarning("❌ Webhook ID {WebhookId} not found in database", webhookId);

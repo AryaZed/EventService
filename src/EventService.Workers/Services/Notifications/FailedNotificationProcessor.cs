@@ -20,40 +20,64 @@ namespace EventService.Workers.Services.Notifications
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            _logger.LogInformation("📩 FailedNotificationProcessor started...");
+
             while (!stoppingToken.IsCancellationRequested)
             {
-                using var scope = _scopeFactory.CreateScope();
-                var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
-                var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
-
-                var failedNotifications = await cacheService.GetKeysAsync("dlq:sms:*");
-
-                foreach (var key in failedNotifications)
+                try
                 {
-                    var notification = await cacheService.GetAsync<JsonElement>(key);
-                    if (notification.ValueKind != JsonValueKind.Undefined)
-                    {
-                        try
-                        {
-                            var phoneNumber = notification.GetProperty("PhoneNumber").GetString();
-                            var message = notification.GetProperty("Message").GetString();
+                    using var scope = _scopeFactory.CreateScope();
+                    var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
+                    var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
 
-                            if (!string.IsNullOrEmpty(phoneNumber) && !string.IsNullOrEmpty(message))
-                            {
-                                await notificationService.SendSmsAsync(phoneNumber, message);
-                                await cacheService.RemoveAsync(key);
-                                _logger.LogInformation("✅ Retried and Sent SMS to {PhoneNumber}", phoneNumber);
-                            }
-                        }
-                        catch (Exception ex)
+                    var failedNotifications = await cacheService.GetKeysAsync("dlq:sms:*");
+
+                    foreach (var key in failedNotifications)
+                    {
+                        var notification = await cacheService.GetAsync<JsonElement>(key);
+                        if (notification.ValueKind != JsonValueKind.Undefined)
                         {
-                            _logger.LogError(ex, "❌ Retrying failed for {PhoneNumber}, keeping in DLQ", key);
+                            try
+                            {
+                                var phoneNumber = notification.GetProperty("PhoneNumber").GetString();
+                                var message = notification.GetProperty("Message").GetString();
+
+                                if (!string.IsNullOrEmpty(phoneNumber) && !string.IsNullOrEmpty(message))
+                                {
+                                    await notificationService.SendSmsAsync(phoneNumber, message);
+                                    await cacheService.RemoveAsync(key);
+                                    _logger.LogInformation("✅ Retried and Sent SMS to {PhoneNumber}", phoneNumber);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "❌ Retrying failed for {PhoneNumber}, keeping in DLQ", key);
+                            }
                         }
                     }
                 }
+                catch (TaskCanceledException)
+                {
+                    _logger.LogWarning("⏳ Task canceled: FailedNotificationProcessor is shutting down.");
+                    break; // Exit the loop gracefully
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "🚨 Unexpected error in FailedNotificationProcessor");
+                }
 
-                await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+                try
+                {
+                    await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+                }
+                catch (TaskCanceledException)
+                {
+                    _logger.LogWarning("🛑 Delay interrupted: FailedNotificationProcessor stopping.");
+                    break;
+                }
             }
+
+            _logger.LogInformation("📩 FailedNotificationProcessor stopped.");
         }
     }
 }

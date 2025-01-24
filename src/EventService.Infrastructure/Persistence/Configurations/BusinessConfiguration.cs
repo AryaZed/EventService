@@ -16,5 +16,15 @@ public class BusinessConfiguration : IEntityTypeConfiguration<Business>
         builder.HasMany(b => b.Users)
             .WithOne(u => u.Business)
             .HasForeignKey(u => u.BusinessId);
+
+        builder.HasOne(b => b.SubscriptionPlan)
+                  .WithMany() // No inverse navigation property
+                  .HasForeignKey(b => b.SubscriptionPlanId)
+                  .OnDelete(DeleteBehavior.Restrict); // ✅ Prevents cascading delete
+
+        builder.HasMany(b => b.CreatedSubscriptionPlans)
+               .WithOne(sp => sp.Business)
+               .HasForeignKey(sp => sp.BusinessId)
+               .OnDelete(DeleteBehavior.Restrict); // ✅ Prevents accidental deletions
     }
 }
