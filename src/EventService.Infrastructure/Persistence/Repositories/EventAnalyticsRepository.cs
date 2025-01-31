@@ -48,5 +48,23 @@ namespace EventService.Infrastructure.Persistence.Repositories
                 .Select(g => new { EventId = g.Key, Score = g.Average(a => a.EngagementScore) })
                 .ToDictionaryAsync(e => e.EventId, e => e.Score);
         }
+
+        // ✅ Get all event analytics (used for AI predictions)
+        public async Task<List<EventAnalytics>> GetAllEventAnalyticsAsync()
+        {
+            return await _context.EventAnalytics
+                .OrderByDescending(a => a.Timestamp)
+                .ToListAsync();
+        }
+
+        // ✅ Get user engagement history based on past event interactions
+        public async Task<List<EventAnalytics>> GetUserEngagementHistoryAsync(Guid userId)
+        {
+            return await _context.EventAnalytics
+                .Where(a => a.Event.EventAttendees.Any(ua => ua.UserId == userId)) // ✅ Tracks user participation in events
+                .OrderByDescending(a => a.Timestamp)
+                .ToListAsync();
+        }
+
     }
 }

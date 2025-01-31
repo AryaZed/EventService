@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace EventService.Application.Services.Caching
@@ -26,19 +27,34 @@ namespace EventService.Application.Services.Caching
         public async Task<T?> GetAsync<T>(string key)
         {
             var cachedData = await _cache.GetStringAsync(key);
-            return string.IsNullOrEmpty(cachedData) ? default : JsonSerializer.Deserialize<T>(cachedData);
+            if (string.IsNullOrEmpty(cachedData)) return default;
+
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true, // ✅ Ensure case-insensitive matching
+                ReferenceHandler = ReferenceHandler.IgnoreCycles
+            };
+
+            return JsonSerializer.Deserialize<T>(cachedData, options);
         }
 
         public async Task SetAsync<T>(string key, T value, TimeSpan expiration)
         {
-            var options = new DistributedCacheEntryOptions
+            var options = new JsonSerializerOptions
+            {
+                ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.Preserve, // ✅ Fix circular dependencies
+                PropertyNameCaseInsensitive = true
+            };
+
+            var serializedValue = JsonSerializer.Serialize(value, options);
+
+            var cacheOptions = new DistributedCacheEntryOptions
             {
                 AbsoluteExpirationRelativeToNow = expiration,
                 SlidingExpiration = TimeSpan.FromMinutes(expiration.TotalMinutes / 2) // ✅ Sliding Expiration
             };
 
-            var serializedValue = JsonSerializer.Serialize(value);
-            await _cache.SetStringAsync(key, serializedValue, options);
+            await _cache.SetStringAsync(key, serializedValue, cacheOptions);
         }
 
         public async Task RemoveAsync(string key)

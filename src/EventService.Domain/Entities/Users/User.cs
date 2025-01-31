@@ -1,4 +1,5 @@
 ﻿using EventService.Domain.Entities.Businesses;
+using EventService.Domain.Entities.Events;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,6 +18,8 @@ public class User
     public Business Business { get; private set; }
     public List<UserUserGroup> UserUserGroups { get; private set; } = new();
     public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
+
+    public List<EventAttendee> EventAttendees { get; private set; } = new();
 
     private User() { }
 

@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace EventService.Infrastructure.Persistence.Repositories;
@@ -61,16 +62,18 @@ public class BusinessRepository : IBusinessRepository
     {
         var cacheKey = $"business:{tenantId}";
         var cachedBusiness = await _cacheService.GetAsync<Business>(cacheKey);
+
         if (cachedBusiness is not null)
             return cachedBusiness;
 
         var business = await _context.Businesses
-            .Include(i => i.SubscriptionPlan)
+            .Include(b => b.SubscriptionPlan) // ✅ Ensure SubscriptionPlan is included
+            .AsNoTracking() // ✅ Prevent EF Core from tracking entities unnecessarily
             .FirstOrDefaultAsync(b => b.Id == tenantId);
 
         if (business is not null)
         {
-            await _cacheService.SetAsync(cacheKey, business, TimeSpan.FromMinutes(30)); // Cache for 30 min
+            await _cacheService.SetAsync(cacheKey, business, TimeSpan.FromMinutes(30));
         }
 
         return business;

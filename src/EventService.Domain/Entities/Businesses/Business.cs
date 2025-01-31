@@ -1,5 +1,6 @@
 ﻿using EventService.Domain.Entities.Integrations;
 using EventService.Domain.Entities.Users;
+using System.Text.Json.Serialization;
 
 namespace EventService.Domain.Entities.Businesses;
 
@@ -24,6 +25,7 @@ public class Business
 
     private Business() { }
 
+    [JsonConstructor]
     public Business(string name, string contactEmail, string phoneNumber, SubscriptionPlan subscriptionPlan)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));

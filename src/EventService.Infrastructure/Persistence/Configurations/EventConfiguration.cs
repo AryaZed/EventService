@@ -18,11 +18,16 @@ public class EventConfiguration : IEntityTypeConfiguration<Event>
         builder.Property(e => e.Title).IsRequired().HasMaxLength(255);
         builder.Property(e => e.Description).IsRequired();
         builder.Property(e => e.ScheduledAt).IsRequired();
-        builder.Property(e => e.TargetRulesJson).IsRequired();
+        builder.Property(e => e.TargetRulesJson).IsRequired().HasColumnType("nvarchar(max)");
 
         builder.HasOne(e => e.Business)
             .WithMany()
             .HasForeignKey(e => e.BusinessId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(e => e.EventAttendees)
+           .WithOne(ea => ea.Event)
+           .HasForeignKey(ea => ea.EventId)
+           .OnDelete(DeleteBehavior.NoAction);
     }
 }

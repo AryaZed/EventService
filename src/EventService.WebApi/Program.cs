@@ -87,6 +87,13 @@ builder.Services.AddHttpClient("EventServiceClient")
         options.Retry.Delay = TimeSpan.FromSeconds(2);
     });
 
+builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
+{
+    options.SerializerOptions.PropertyNameCaseInsensitive = true; // ✅ Allow case-insensitive deserialization
+    options.SerializerOptions.PropertyNamingPolicy = null; // ✅ Ensure names match exactly
+    options.SerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles; // ✅ Prevent circular reference issues
+});
+
 // Add OpenAPI (Swagger)
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>

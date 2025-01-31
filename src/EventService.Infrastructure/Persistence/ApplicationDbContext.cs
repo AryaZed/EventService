@@ -28,6 +28,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Invoice> Invoices { get; set; } // ✅ Billing & Payment Tracking
     public DbSet<AuditLog> AuditLogs { get; set; } // ✅ Compliance & Security Logs
     public DbSet<EventAnalytics> EventAnalytics { get; set; }
+    public DbSet<EventAttendee> EventAttendees { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

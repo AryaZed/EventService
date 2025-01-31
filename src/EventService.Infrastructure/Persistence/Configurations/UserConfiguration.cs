@@ -18,5 +18,10 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
                    .WithMany(b => b.Users)
                    .HasForeignKey(u => u.BusinessId)
                    .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(u => u.EventAttendees)
+            .WithOne(ea => ea.User)
+            .HasForeignKey(ea => ea.UserId)
+            .OnDelete(DeleteBehavior.NoAction);
     }
 }

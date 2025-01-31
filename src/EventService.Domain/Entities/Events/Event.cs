@@ -24,6 +24,8 @@ public class Event
     public List<EventRule> EventRules { get; private set; }
     public RecurrenceType? Recurrence { get; private set; }
 
+    public List<EventAttendee> EventAttendees { get; private set; } = new List<EventAttendee>();
+
     public void SetRecurrence(RecurrenceType recurrence)
     {
         Recurrence = recurrence;
@@ -63,6 +65,25 @@ public class Event
             RecurrenceType.Monthly => ScheduledAt.AddMonths(1),
             _ => null
         };
+    }
+
+    // ✅ New: Add attendee to event
+    public void AddAttendee(User user)
+    {
+        if (!EventAttendees.Exists(a => a.UserId == user.Id))
+        {
+            EventAttendees.Add(new EventAttendee(this, user));
+        }
+    }
+
+    // ✅ New: Remove attendee from event
+    public void RemoveAttendee(User user)
+    {
+        var attendee = EventAttendees.Find(a => a.UserId == user.Id);
+        if (attendee != null)
+        {
+            EventAttendees.Remove(attendee);
+        }
     }
 }
 
